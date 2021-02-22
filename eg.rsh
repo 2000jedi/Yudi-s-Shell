@@ -1,1 +1,1 @@
-ls -a | grep sth > result
+cat file\ name | grep "some thing" > result

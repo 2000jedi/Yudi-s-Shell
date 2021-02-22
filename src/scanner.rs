@@ -20,25 +20,6 @@ pub fn next_token(r : &mut reader::Reader) -> Token {
                 return next_token(r);
             }
 
-            if ! OPERATORS.contains(& val) {
-                // name(id)
-                let mut string : Vec<u8> = Vec::new();
-                while match r.peek() {
-                    Some(val2) => (! OPERATORS.contains(& val2)) && (! SEPS.contains(& val2)),
-                    None => false,
-                } {
-                    let cur_val : char = r.peek().unwrap();
-                    string.push(cur_val as u8);
-                    r.consume(cur_val);
-                }
-
-                let token_val : String = match String::from_utf8(string) {
-                    Ok(v) => v,
-                    Err(_) => panic!("file not encoded in utf-8")
-                };
-                return Token::Name(token_val);
-            }
-
             if val == '"' {
                 // name(id)
                 r.consume(val);
@@ -48,18 +29,45 @@ pub fn next_token(r : &mut reader::Reader) -> Token {
                     Some(val2) => val2 != '"',
                     None => false,
                 } {
-                    let cur_val : char = r.peek().unwrap();
+                    let cur_val = r.peek().unwrap();
                     string.push(cur_val as u8);
                     r.consume(cur_val);
                 }
 
-                let token_val : String = match String::from_utf8(string) {
+                let token_val = match String::from_utf8(string) {
                     Ok(v) => v,
                     Err(_) => panic!("file not encoded in utf-8")
                 };
 
                 r.consume('"');
 
+                return Token::Name(token_val);
+            }
+
+            if ! OPERATORS.contains(& val) {
+                // name(id)
+                let mut string : Vec<u8> = Vec::new();
+                while match r.peek() {
+                    Some(val2) => (! OPERATORS.contains(& val2)) && (! SEPS.contains(& val2)),
+                    None => false,
+                } {
+                    let cur_val = r.peek().unwrap();
+                    if cur_val == '\\' {
+                        // process escape literal
+                        r.consume(cur_val);
+                        let next_val = r.peek().unwrap();
+                        string.push(next_val as u8);
+                        r.consume(next_val);
+                    } else {
+                        string.push(cur_val as u8);
+                        r.consume(cur_val);
+                    }
+                }
+
+                let token_val : String = match String::from_utf8(string) {
+                    Ok(v) => v,
+                    Err(_) => panic!("file not encoded in utf-8")
+                };
                 return Token::Name(token_val);
             }
 
