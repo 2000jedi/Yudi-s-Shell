@@ -1,7 +1,8 @@
 extern crate subprocess;
 
 use super::parser;
-use subprocess::{Pipeline, Exec};
+use std::fs::File;
+use subprocess::{Pipeline, Exec, Redirection};
 
 enum Inst {
     E(Exec),
@@ -22,10 +23,30 @@ fn wait(procs : Vec<Inst>) {
     }
 }
 
+fn create(v : parser::Atom) -> Exec {
+    let mut proc = Exec::cmd(v.pars.get(0).unwrap()).args(&v.pars[1..]);
+
+    match v.src {
+        Some(stdin) => {
+            proc = proc.stdin(Redirection::File(File::open(stdin).unwrap()));
+        }
+        None => {}
+    }
+
+    match v.dest {
+        Some(stdout) => {
+            proc = proc.stdout(Redirection::File(File::create(stdout).unwrap()));
+        }
+        None => {}
+    }
+
+    return proc;
+}
+
 fn walk(ast : parser::AST, stdin : Inst) -> Vec<Inst> {
     match ast {
         parser::AST::Op(v) => {
-            let proc = Exec::cmd(v.pars.get(0).unwrap()).args(&v.pars[1..]);
+            let proc = create(v);
 
             match stdin {
                 Inst::E(proc2) => vec![(Inst::P(proc2 | proc))],
@@ -34,7 +55,7 @@ fn walk(ast : parser::AST, stdin : Inst) -> Vec<Inst> {
             }
         }
         parser::AST::Pipe(first, second) => {
-            let proc1 = Exec::cmd(first.pars.get(0).unwrap()).args(&first.pars[1..]);
+            let proc1 = create(first);
 
             let pipe = match stdin {
                 Inst::E(proc2) => Inst::P(proc2 | proc1),

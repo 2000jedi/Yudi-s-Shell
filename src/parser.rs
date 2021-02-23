@@ -10,9 +10,9 @@ pub struct Atom {
 
 #[derive(Debug, PartialEq)]
 pub enum AST {
-    Op(Atom),   // exec < src > dest
+    Op(Atom),                 // exec < src > dest
     And(Box<AST>, Box<AST>),  // a & b
-    Pipe(Atom, Box<AST>), // a | b
+    Pipe(Atom, Box<AST>),     // a | b
     Error,
 }
 
