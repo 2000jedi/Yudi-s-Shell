@@ -4,6 +4,7 @@ use std::env;
 pub mod reader;
 pub mod scanner;
 pub mod parser;
+pub mod shell;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -14,12 +15,10 @@ fn main() {
     let mut read = reader::Reader::from_file(file_path);
     let ast = parser::ast_gen(&mut read);
     println!("{:?}", ast);
-    // let tc = checker::type_check(ast, & HashMap::new());
-    // println!("{:?}", tc);
 
-    println!("Showing unused tokens:");
+    shell::run(ast);
+
     while read.has_next() {
-        println!("{:?}", scanner::next_token(&mut read));
+        println!("error: unused token \"{:?}\"", scanner::next_token(&mut read));
     }
-    //println!("{:?}", parser::ast_gen(&mut read));
 }

@@ -2,11 +2,17 @@ use super::scanner;
 use super::reader;
 
 #[derive(Debug, PartialEq)]
+pub struct Atom {
+    pub pars : Vec<String>,
+    pub src  : Option<String>,
+    pub dest : Option<String>
+}
+
+#[derive(Debug, PartialEq)]
 pub enum AST {
-    Atom(String),
-    Op(Vec<AST>, Option<Box<AST>>),   // exec > dest
+    Op(Atom),   // exec < src > dest
     And(Box<AST>, Box<AST>),  // a & b
-    Pipe(Box<AST>, Box<AST>), // a | b
+    Pipe(Atom, Box<AST>), // a | b
     Error,
 }
 
@@ -15,7 +21,7 @@ fn match_expr(r : &mut reader::Reader) -> (scanner::Token, AST) {
     let mut v = Vec::new();
     match next {
         scanner::Token::Name(name) => {
-            v.push(AST::Atom(name));
+            v.push(name);
         },
         _ => panic!("Name(str) required, {:?} found", next),
     }
@@ -23,30 +29,54 @@ fn match_expr(r : &mut reader::Reader) -> (scanner::Token, AST) {
     next = scanner::next_token(r);
     while match next {
         scanner::Token::Name(name2) => {
-            v.push(AST::Atom(name2));
+            v.push(name2);
             next = scanner::next_token(r);
             true
         },
         _ => false,
     } {}
 
-    match next {
+    let src = match next {
+        scanner::Token::Opr(c) => {
+            if c == '<' {
+                next = scanner::next_token(r);
+                match next {
+                    scanner::Token::Name(from) => {
+                        next = scanner::next_token(r);
+                        Some(from)
+                    }
+                    _ => panic!("Name expected, {:?} found", next),
+                }
+            } else {
+                None
+            }
+        }
+        _ => {
+            None
+        }
+    };
+
+    let dest = match next {
         scanner::Token::Opr(c) => {
             if c == '>' {
                 next = scanner::next_token(r);
                 match next {
-                    scanner::Token::Name(to) => 
-                        (scanner::Token::Empty, AST::Op(v, Some(Box::new(AST::Atom(to))))),
+                    scanner::Token::Name(to) => {
+                        next = scanner::next_token(r);
+                        Some(to)
+                    }
                     _ => panic!("Name expected, {:?} found", next),
                 }
             } else {
-                (next, AST::Op(v, None))
+                None
             }
         }
         _ => {
-            (next, AST::Op(v, None))
+            None
         }
-    }
+    };
+
+    (next, AST::Op(Atom {pars: v, src: src, dest: dest} ))
 }
 
 fn match_pipe(r : &mut reader::Reader) -> (scanner::Token, AST) {
@@ -64,7 +94,11 @@ fn match_pipe(r : &mut reader::Reader) -> (scanner::Token, AST) {
         }
     } {
         let expr2 = match_pipe(r);
-        (expr2.0, AST::Pipe(Box::new(expr1.1), Box::new(expr2.1)))
+        let e1 = match expr1.1 {
+            AST::Op(v) => v,
+            _ => panic!("unexpected token {:?}", expr1.1)
+        };
+        (expr2.0, AST::Pipe(e1, Box::new(expr2.1)))
     } else {
         expr1
     }

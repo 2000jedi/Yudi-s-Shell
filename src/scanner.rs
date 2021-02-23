@@ -10,7 +10,7 @@ pub enum Token {
 }
 
 const SEPS : [char; 3] = [' ', '\r', '\n'];
-const OPERATORS : [char; 4] = [',', '|', '>', '&'];
+const OPERATORS : [char; 5] = [',', '|', '<', '>', '&'];
     
 pub fn next_token(r : &mut reader::Reader) -> Token {
     match r.peek() {

@@ -1,1 +1,1 @@
-cat file\ name | grep "some thing" > result
+ps -e | grep trojan | grep ttys000
