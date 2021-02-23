@@ -1,6 +1,8 @@
 extern crate subprocess;
 
 use super::parser;
+use std::env;
+use std::path::Path;
 use std::fs::File;
 use subprocess::{Pipeline, Exec, Redirection};
 
@@ -12,19 +14,44 @@ enum Inst {
 
 fn wait(procs : Vec<Inst>) {
     for p in procs {
-        let exit_status = match p {
-            Inst::E(e) => e.join().unwrap(),
-            Inst::P(p) => p.join().unwrap(),
-            Inst::N    => panic!("empty process"),
-        };
-        if ! exit_status.success() {
-            println!("{:?}", exit_status);
+        match p {
+            Inst::E(e) => {
+                let exit_status = e.join().unwrap();
+                if ! exit_status.success() {
+                    println!("{:?}", exit_status);
+                }
+            }
+            Inst::P(p) => {
+                let exit_status = p.join().unwrap();
+                if ! exit_status.success() {
+                    println!("{:?}", exit_status);
+                }
+            }
+            Inst::N    => {}
         }
     }
 }
 
-fn create(v : parser::Atom) -> Exec {
-    let mut proc = Exec::cmd(v.pars.get(0).unwrap()).args(&v.pars[1..]);
+const BUILTIN : [&str; 1] = ["cd"];
+
+fn builtin(proc_name: String, args: &[String]) {
+    if proc_name == "cd" {
+        if args.len() != 1 {
+            panic!("cd: 1 parameter expected, {} given", args.len());
+        }
+        let base_path = args.get(0).unwrap();
+        env::set_current_dir(Path::new(base_path)).unwrap();
+    }
+}
+
+fn create(v : parser::Atom) -> Option<Exec> {
+    let proc_name = v.pars.get(0).unwrap();
+    if BUILTIN.contains(&proc_name.as_str()) {
+        builtin(proc_name.to_string(), &v.pars[1..]);
+        return None;
+    }
+
+    let mut proc = Exec::cmd(proc_name).args(&v.pars[1..]);
 
     match v.src {
         Some(stdin) => {
@@ -40,13 +67,16 @@ fn create(v : parser::Atom) -> Exec {
         None => {}
     }
 
-    return proc;
+    return Some(proc);
 }
 
 fn walk(ast : parser::AST, stdin : Inst) -> Vec<Inst> {
     match ast {
         parser::AST::Op(v) => {
-            let proc = create(v);
+            let proc = match create(v){
+                Some(v) => v,
+                None    => return vec![],
+            };
 
             match stdin {
                 Inst::E(proc2) => vec![(Inst::P(proc2 | proc))],
@@ -55,7 +85,10 @@ fn walk(ast : parser::AST, stdin : Inst) -> Vec<Inst> {
             }
         }
         parser::AST::Pipe(first, second) => {
-            let proc1 = create(first);
+            let proc1 = match create(first){
+                Some(v) => v,
+                None    => return vec![],
+            };
 
             let pipe = match stdin {
                 Inst::E(proc2) => Inst::P(proc2 | proc1),
@@ -72,9 +105,8 @@ fn walk(ast : parser::AST, stdin : Inst) -> Vec<Inst> {
 
             proc1
         }
-        parser::AST::Error => {
-            panic!("an error occured in command-line");
-        }
+        parser::AST::Empty => vec![],
+        parser::AST::Error => panic!("an error occured in command-line"),
     }
 }
 

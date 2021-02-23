@@ -13,6 +13,7 @@ pub enum AST {
     Op(Atom),                 // exec < src > dest
     And(Box<AST>, Box<AST>),  // a & b
     Pipe(Atom, Box<AST>),     // a | b
+    Empty,
     Error,
 }
 
@@ -22,7 +23,10 @@ fn match_expr(r : &mut reader::Reader) -> (scanner::Token, AST) {
     match next {
         scanner::Token::Name(name) => {
             v.push(name);
-        },
+        }
+        scanner::Token::EOF => {
+            return (scanner::Token::Empty, AST::Empty);
+        }
         _ => panic!("Name(str) required, {:?} found", next),
     }
 
