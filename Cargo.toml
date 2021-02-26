@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 
 subprocess = "0.1"
+lazy_static = "*"

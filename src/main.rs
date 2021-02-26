@@ -5,6 +5,7 @@ pub mod reader;
 pub mod scanner;
 pub mod parser;
 pub mod shell;
+pub mod job_manager;
 
 fn repl() {
     loop {
