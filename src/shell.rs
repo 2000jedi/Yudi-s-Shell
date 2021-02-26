@@ -1,10 +1,14 @@
 extern crate subprocess;
 
 use super::parser;
+use super::job_manager;
 use std::env;
 use std::path::Path;
 use std::fs::File;
+use std::sync::Mutex;
+
 use subprocess::{Pipeline, Exec, Redirection};
+use lazy_static::lazy_static;
 
 enum Inst {
     E(Exec),
@@ -32,22 +36,100 @@ fn wait(procs : Vec<Inst>) {
     }
 }
 
-const BUILTIN : [&str; 1] = ["cd"];
+const BUILTIN : [&str; 4] = ["cd", "jobs", "fg", "bg"];
 
-fn builtin(proc_name: String, args: &[String]) {
+lazy_static! {
+    static ref JOBS : Mutex<job_manager::Jobs> = Mutex::new(job_manager::Jobs::new());
+}
+
+fn builtin(proc_name: String, atom: parser::Atom) {
     if proc_name == "cd" {
+        let args = &atom.pars[1..];
         if args.len() != 1 {
             panic!("cd: 1 parameter expected, {} given", args.len());
         }
         let base_path = args.get(0).unwrap();
-        env::set_current_dir(Path::new(base_path)).unwrap();
+
+        match env::set_current_dir(Path::new(base_path)) {
+            Ok(_) => {}
+            Err(e) => {
+                eprintln!("{}", e);
+            }
+        }
+
+        return;
+    }
+    if proc_name == "bg" {
+        let proc_match_create = create(parser::Atom {
+            pars: (&atom.pars[1..]).to_vec(),
+            src:  atom.src,
+            dest: atom.dest
+        });
+
+        let proc_match = match proc_match_create {
+            Some(v) => v.detached().popen(),
+            None => {
+                eprintln!("{} is a builtin command", atom.pars[1]);
+                return;
+            }
+        };
+
+        let proc = match proc_match {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!("{}", e);
+                return;
+            }
+        };
+
+        let mut jobs_lock = JOBS.lock();
+        loop {
+            match jobs_lock {
+                Ok(mut j) => {
+                    j.push(proc, atom.pars.join(" "));
+                    // TODO: recycle zombie processes
+                    break;
+                }
+                Err(_) => jobs_lock = JOBS.lock(),
+            }
+        }
+        
+        return;
+    }
+
+    if proc_name == "fg" {
+        let mut jobs_lock = JOBS.lock();
+        loop {
+            match jobs_lock {
+                Ok(mut j) => {
+                    // TODO: make job to foreground
+                    break;
+                }
+                Err(_) => jobs_lock = JOBS.lock(),
+            }
+        }
+    }
+
+    if proc_name == "jobs" {
+        let mut jobs_lock = JOBS.lock();
+        loop {
+            match jobs_lock {
+                Ok(j) => {
+                    j.print();
+                    break;
+                }
+                Err(_) => jobs_lock = JOBS.lock(),
+            }
+        }
+
+        return;
     }
 }
 
 fn create(v : parser::Atom) -> Option<Exec> {
     let proc_name = v.pars.get(0).unwrap();
     if BUILTIN.contains(&proc_name.as_str()) {
-        builtin(proc_name.to_string(), &v.pars[1..]);
+        builtin(proc_name.to_string(), v);
         return None;
     }
 
