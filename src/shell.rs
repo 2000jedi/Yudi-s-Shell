@@ -20,15 +20,28 @@ fn wait(procs : Vec<Inst>) {
     for p in procs {
         match p {
             Inst::E(e) => {
-                let exit_status = e.join().unwrap();
+                let exit_status = match e.join() {
+                    Ok(val) => val,
+                    Err(err) => {
+                        println!("{}", err);
+                        continue;
+                    }
+                };
+
                 if ! exit_status.success() {
-                    println!("{:?}", exit_status);
+                    println!("[Process exited with {:?}]", exit_status);
                 }
             }
             Inst::P(p) => {
-                let exit_status = p.join().unwrap();
+                let exit_status = match p.join() {
+                    Ok(val) => val,
+                    Err(err) => {
+                        println!("{}", err);
+                        continue;
+                    }
+                };
                 if ! exit_status.success() {
-                    println!("{:?}", exit_status);
+                    println!("[Process exited with {:?}]", exit_status);
                 }
             }
             Inst::N    => {}
@@ -60,10 +73,12 @@ fn builtin(proc_name: String, atom: parser::Atom) {
         return;
     }
     if proc_name == "bg" {
+        /*
         let proc_match_create = create(parser::Atom {
             pars: (&atom.pars[1..]).to_vec(),
             src:  atom.src,
-            dest: atom.dest
+            dest: atom.dest,
+            isbg: atom.isbg,
         });
 
         let proc_match = match proc_match_create {
@@ -92,7 +107,7 @@ fn builtin(proc_name: String, atom: parser::Atom) {
                 }
                 Err(_) => jobs_lock = JOBS.lock(),
             }
-        }
+        }*/
         
         return;
     }
@@ -101,8 +116,8 @@ fn builtin(proc_name: String, atom: parser::Atom) {
         let mut jobs_lock = JOBS.lock();
         loop {
             match jobs_lock {
-                Ok(mut j) => {
-                    // TODO: make job to foreground
+                Ok(_) => {
+                    // TODO: move job to foreground by spinn-waiting it
                     break;
                 }
                 Err(_) => jobs_lock = JOBS.lock(),
@@ -147,6 +162,29 @@ fn create(v : parser::Atom) -> Option<Exec> {
             proc = proc.stdout(Redirection::File(File::create(stdout).unwrap()));
         }
         None => {}
+    }
+
+    if v.isbg {
+        let bg_proc = match proc.detached().popen() {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!("{}", e);
+                return None;
+            }
+        };
+
+        let mut jobs_lock = JOBS.lock();
+        loop {
+            match jobs_lock {
+                Ok(mut j) => {
+                    j.push(bg_proc, v.pars.join(" "));
+                    // TODO: recycle zombie processes
+                    break;
+                }
+                Err(_) => jobs_lock = JOBS.lock(),
+            }
+        }
+        return None;
     }
 
     return Some(proc);

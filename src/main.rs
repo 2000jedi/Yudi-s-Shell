@@ -19,6 +19,13 @@ fn repl() {
             match io::stdin().read_line(&mut buf) {
                 Ok(n) => {
                     if n <= 1 {
+                        if line.len() == 0 {
+                            print!("{} ➜ ", path);
+                            io::stdout().flush().unwrap();
+                        } else {
+                            print!("> ");
+                            io::stdout().flush().unwrap();
+                        }
                         continue;
                     }
                     if buf.as_bytes()[n - 2] != '\\' as u8 {
@@ -37,13 +44,19 @@ fn repl() {
             }
         }
 
+        if line.ends_with('\n') {
+            /* truncate terminating newline symbols */
+            line.pop();
+            if line.ends_with('\r') {
+                line.pop();
+            }
+        }
+
         let mut read = reader::Reader::from_string(line);
         let ast = parser::ast_gen(&mut read);
         println!("{:?}", ast);
         shell::run(ast);
     }
-    
-    // env::set_current_dir()
 }
 
 fn main() {
@@ -57,7 +70,6 @@ fn main() {
     };
     let mut read = reader::Reader::from_file(file_path);
     let ast = parser::ast_gen(&mut read);
-
     shell::run(ast);
 
     while read.has_next() {

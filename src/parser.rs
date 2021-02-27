@@ -3,9 +3,10 @@ use super::reader;
 
 #[derive(Debug, PartialEq)]
 pub struct Atom {
-    pub pars : Vec<String>,
-    pub src  : Option<String>,
-    pub dest : Option<String>
+    pub pars : Vec<String>,     // parameters of the process
+    pub src  : Option<String>,  // direct pipe from a file
+    pub dest : Option<String>,  // direct pipe to a file
+    pub isbg : bool,            // run the process in background
 }
 
 #[derive(Debug, PartialEq)]
@@ -80,7 +81,19 @@ fn match_expr(r : &mut reader::Reader) -> (scanner::Token, AST) {
         }
     };
 
-    (next, AST::Op(Atom {pars: v, src: src, dest: dest} ))
+    let bg = match next {
+        scanner::Token::Opr(c) => {
+            if (c == '&') && (! r.has_next()) {
+                next = scanner::Token::EOF;
+                true
+            } else {
+                false
+            }
+        }
+        _ => false,
+    };
+
+    (next, AST::Op(Atom {pars: v, src: src, dest: dest, isbg: bg} ))
 }
 
 fn match_pipe(r : &mut reader::Reader) -> (scanner::Token, AST) {
