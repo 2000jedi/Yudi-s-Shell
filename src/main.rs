@@ -14,20 +14,33 @@ fn repl() {
         print!("{} ➜ ", path);
         io::stdout().flush().unwrap();
         let mut line = String::new();
-        match io::stdin().read_line(&mut line) {
-            Ok(n) => {
-                if n == 0 {
-                    return;
+        let mut buf = String::new();
+        loop {
+            match io::stdin().read_line(&mut buf) {
+                Ok(n) => {
+                    if n <= 1 {
+                        continue;
+                    }
+                    if buf.as_bytes()[n - 2] != '\\' as u8 {
+                        line = line + &buf;
+                        break;
+                    } else {
+                        line = line + &buf[..n-2];
+                    }
+                    buf = String::new();
+                    print!("> ");
+                    io::stdout().flush().unwrap();
                 }
-                let mut read = reader::Reader::from_string(line);
-                let ast = parser::ast_gen(&mut read);
-                println!("{:?}", ast);
-                shell::run(ast);
-            }
-            Err(e) => {
-                panic!("unexpected end-of-input: {}", e);
+                Err(e) => {
+                    panic!("unexpected end-of-input: {}", e);
+                }
             }
         }
+
+        let mut read = reader::Reader::from_string(line);
+        let ast = parser::ast_gen(&mut read);
+        println!("{:?}", ast);
+        shell::run(ast);
     }
     
     // env::set_current_dir()
