@@ -118,8 +118,8 @@ fn builtin(proc_name: String, atom: parser::Atom) {
         "exit" => {
             std::process::exit(0);
         }
-        other => {
-            eprintln!("{} is not a builtin command", other)
+        _ => {
+            unreachable!();
         }
     }
 }

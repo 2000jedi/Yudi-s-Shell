@@ -7,7 +7,7 @@
 - [x] background subprocesses listening and recycling
 - [x] pass signals to children (`Ctrl-C` and `Ctrl-Z`)
 - [x] block signals to background processes.  
-    - [ ] FIXME: this can only be fixed by libc::setpgid, which is not supported in crate `subprocess`.
+    - [x] FIXME: this can only be fixed by libc::setpgid, which is not supported in crate `subprocess`.
 - [ ] `bg` and `fg` command
 
 ## Future Works

@@ -6,8 +6,14 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+opt-level = 3
+
 [dependencies]
 
-subprocess = "0.1"
+subprocess = { git = "https://github.com/2000jedi/rust-subprocess/" }
 lazy_static = "*"
 libc = "*"
