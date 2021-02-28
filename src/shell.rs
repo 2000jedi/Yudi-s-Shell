@@ -49,95 +49,61 @@ fn wait(procs : Vec<Inst>) {
     }
 }
 
-const BUILTIN : [&str; 4] = ["cd", "jobs", "fg", "bg"];
+const BUILTIN : [&str; 5] = ["cd", "jobs", "fg", "bg", "exit"];
 
 lazy_static! {
-    static ref JOBS : Mutex<job_manager::Jobs> = Mutex::new(job_manager::Jobs::new());
+    pub static ref JOBS : Mutex<job_manager::Jobs> = Mutex::new(job_manager::Jobs::new());
 }
 
 fn builtin(proc_name: String, atom: parser::Atom) {
-    if proc_name == "cd" {
-        let args = &atom.pars[1..];
-        if args.len() != 1 {
-            panic!("cd: 1 parameter expected, {} given", args.len());
-        }
-        let base_path = args.get(0).unwrap();
-
-        match env::set_current_dir(Path::new(base_path)) {
-            Ok(_) => {}
-            Err(e) => {
-                eprintln!("{}", e);
+    match proc_name.as_str() {
+        "cd" => {
+            let args = &atom.pars[1..];
+            if args.len() != 1 {
+                panic!("cd: 1 parameter expected, {} given", args.len());
             }
-        }
+            let base_path = args.get(0).unwrap();
 
-        return;
-    }
-    if proc_name == "bg" {
-        /*
-        let proc_match_create = create(parser::Atom {
-            pars: (&atom.pars[1..]).to_vec(),
-            src:  atom.src,
-            dest: atom.dest,
-            isbg: atom.isbg,
-        });
-
-        let proc_match = match proc_match_create {
-            Some(v) => v.detached().popen(),
-            None => {
-                eprintln!("{} is a builtin command", atom.pars[1]);
-                return;
-            }
-        };
-
-        let proc = match proc_match {
-            Ok(v) => v,
-            Err(e) => {
-                eprintln!("{}", e);
-                return;
-            }
-        };
-
-        let mut jobs_lock = JOBS.lock();
-        loop {
-            match jobs_lock {
-                Ok(mut j) => {
-                    j.push(proc, atom.pars.join(" "));
-                    // TODO: recycle zombie processes
-                    break;
+            match env::set_current_dir(Path::new(base_path)) {
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!("{}", e);
                 }
-                Err(_) => jobs_lock = JOBS.lock(),
-            }
-        }*/
-        
-        return;
-    }
-
-    if proc_name == "fg" {
-        let mut jobs_lock = JOBS.lock();
-        loop {
-            match jobs_lock {
-                Ok(_) => {
-                    // TODO: move job to foreground by spinn-waiting it
-                    break;
-                }
-                Err(_) => jobs_lock = JOBS.lock(),
             }
         }
-    }
+        "bg" => {
 
-    if proc_name == "jobs" {
-        let mut jobs_lock = JOBS.lock();
-        loop {
-            match jobs_lock {
-                Ok(j) => {
-                    j.print();
-                    break;
+        }
+        "fg" => {
+            let mut jobs_lock = JOBS.lock();
+            loop {
+                match jobs_lock {
+                    Ok(_) => {
+                        // TODO: move job to foreground by spinn-waiting it
+                        break;
+                    }
+                    Err(_) => jobs_lock = JOBS.lock(),
                 }
-                Err(_) => jobs_lock = JOBS.lock(),
             }
         }
-
-        return;
+        "jobs" => {
+            let mut jobs_lock = JOBS.lock();
+            loop {
+                match jobs_lock {
+                    Ok(j) => {
+                        j.print();
+                        break;
+                    }
+                    Err(_) => jobs_lock = JOBS.lock(),
+                }
+            }
+        }
+        "exit" => {
+            std::process::exit(0);
+        }
+        other => {
+            eprintln!("{} is not a builtin command", other)
+        }
     }
 }
 

@@ -4,9 +4,10 @@
 - [x] fix `~` for path
 - [x] multi-line command (`\` symbol)
 - [x] putting process in background (`&` ending)
-- [ ] background subprocesses listening and recycling
+- [x] background subprocesses listening and recycling
+- [x] pass signals to children (`Ctrl-C` and `Ctrl-Z`)
 - [ ] `bg` and `fg` command
-- [ ] pass signals to children (`Ctrl-C` and `Ctrl-Z`)
+- [ ] block signals to background processes.
 
 ## Future Works
 - [ ] Support REPL with GNU/readline
