@@ -10,4 +10,4 @@ edition = "2018"
 
 subprocess = "0.1"
 lazy_static = "*"
-signal-hook = "*"
+libc = "*"

@@ -6,8 +6,9 @@
 - [x] putting process in background (`&` ending)
 - [x] background subprocesses listening and recycling
 - [x] pass signals to children (`Ctrl-C` and `Ctrl-Z`)
+- [x] block signals to background processes.  
+    - [ ] FIXME: this can only be fixed by libc::setpgid, which is not supported in crate `subprocess`.
 - [ ] `bg` and `fg` command
-- [ ] block signals to background processes.
 
 ## Future Works
 - [ ] Support REPL with GNU/readline

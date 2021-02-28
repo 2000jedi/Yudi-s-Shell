@@ -19,7 +19,7 @@ impl Jobs {
 
     pub fn print(&self) {
         for job in &self.jobs {
-            println!("[{}] ({}) {}", job.jid, job.pid, job.cmd);
+            println!("[{}] {} {}", job.jid, job.pid, job.cmd);
         }
     }
 
@@ -36,13 +36,17 @@ impl Jobs {
         self.cnt += 1;
     }
 
+    pub fn back(&self) -> &Job {
+        return self.jobs.get(self.jobs.len() - 1).unwrap();
+    }
+
     pub fn refresh(&mut self) {
         let mut ind : usize = 0;
         let mut v : Vec<usize> = vec![];
         for job in &mut self.jobs {
             match job.proc.poll() {
                 Some(exit_status) => {
-                    println!("[{}] ({}) {:?} {}", job.jid, job.pid, exit_status, job.cmd);
+                    println!("[{}] {} {:?} {}", job.jid, job.pid, exit_status, job.cmd);
                     v.insert(0, ind);
                 }
                 None => {}

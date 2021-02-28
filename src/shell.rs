@@ -7,53 +7,74 @@ use std::path::Path;
 use std::fs::File;
 use std::sync::Mutex;
 
-use subprocess::{Pipeline, Exec, Redirection};
+use subprocess::{Pipeline, Exec, Redirection, Popen};
 use lazy_static::lazy_static;
 
-enum Inst {
+lazy_static! {
+    pub static ref FG_JOBS : Mutex<Vec<u32>> = Mutex::new(vec![]);
+    pub static ref JOBS : Mutex<job_manager::Jobs> = Mutex::new(job_manager::Jobs::new());
+}
+
+pub enum Inst {
     E(Exec),
     P(Pipeline),
     N,            // null
 }
 
-fn wait(procs : Vec<Inst>) {
-    for p in procs {
-        match p {
+fn wait(jobs : Vec<Inst>) {
+    let mut procs : Vec<Popen> = vec![];
+    let mut pids : Vec<u32> = vec![];
+    for j in jobs {
+        match j {
             Inst::E(e) => {
-                let exit_status = match e.join() {
-                    Ok(val) => val,
-                    Err(err) => {
-                        println!("{}", err);
-                        continue;
+                match e.detached().popen() {
+                    Ok(proc) => {
+                        pids.push(proc.pid().unwrap());
+                        procs.push(proc);
                     }
-                };
-
-                if ! exit_status.success() {
-                    println!("[Process exited with {:?}]", exit_status);
+                    Err(err) => eprintln!("{}", err)
                 }
             }
             Inst::P(p) => {
-                let exit_status = match p.join() {
-                    Ok(val) => val,
-                    Err(err) => {
-                        println!("{}", err);
-                        continue;
+                match p.popen() {
+                    Ok(proc) => {
+                        for p in proc {
+                            pids.push(p.pid().unwrap());
+                            procs.push(p);
+                        }
                     }
-                };
-                if ! exit_status.success() {
-                    println!("[Process exited with {:?}]", exit_status);
+                    Err(err) => eprintln!("{}", err)
                 }
             }
             Inst::N    => {}
         }
     }
+
+    match FG_JOBS.lock() {
+        Ok(mut fg) => {
+            *fg = pids;
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            return;
+        }
+    }
+
+    for mut p in procs {
+        let exit_status = match p.wait() {
+            Ok(val) => val,
+            Err(err) => {
+                println!("{}", err);
+                continue;
+            }
+        };
+        if ! exit_status.success() {
+            println!("[Process exited with {:?}]", exit_status);
+        }
+    }
 }
 
 const BUILTIN : [&str; 5] = ["cd", "jobs", "fg", "bg", "exit"];
-
-lazy_static! {
-    pub static ref JOBS : Mutex<job_manager::Jobs> = Mutex::new(job_manager::Jobs::new());
-}
 
 fn builtin(proc_name: String, atom: parser::Atom) {
     match proc_name.as_str() {
@@ -75,26 +96,22 @@ fn builtin(proc_name: String, atom: parser::Atom) {
 
         }
         "fg" => {
-            let mut jobs_lock = JOBS.lock();
-            loop {
-                match jobs_lock {
-                    Ok(_) => {
-                        // TODO: move job to foreground by spinn-waiting it
-                        break;
-                    }
-                    Err(_) => jobs_lock = JOBS.lock(),
+            match JOBS.lock() {
+                Ok(_) => {
+                    // TODO: move job to foreground by spinn-waiting it
+                }
+                Err(e) => {
+                    eprintln!("{}", e);
                 }
             }
         }
         "jobs" => {
-            let mut jobs_lock = JOBS.lock();
-            loop {
-                match jobs_lock {
-                    Ok(j) => {
-                        j.print();
-                        break;
-                    }
-                    Err(_) => jobs_lock = JOBS.lock(),
+            match JOBS.lock() {
+                Ok(j) => {
+                    j.print();
+                }
+                Err(e) => {
+                    eprintln!("{}", e);
                 }
             }
         }
@@ -139,15 +156,14 @@ fn create(v : parser::Atom) -> Option<Exec> {
             }
         };
 
-        let mut jobs_lock = JOBS.lock();
-        loop {
-            match jobs_lock {
-                Ok(mut j) => {
-                    j.push(bg_proc, v.pars.join(" "));
-                    // TODO: recycle zombie processes
-                    break;
-                }
-                Err(_) => jobs_lock = JOBS.lock(),
+        match JOBS.lock() {
+            Ok(mut j) => {
+                j.push(bg_proc, v.pars.join(" "));
+                let job = j.back();
+                println!("[{}] {} {}", job.jid, job.pid, job.cmd);
+            }
+            Err(e) => {
+                eprintln!("{}", e);
             }
         }
         return None;
