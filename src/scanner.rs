@@ -1,5 +1,5 @@
 use super::reader;
-use std::env;
+use super::utils;
 
 #[derive(Debug)]
 pub enum Token {
@@ -61,13 +61,7 @@ pub fn next_token(r : &mut reader::Reader) -> Token {
                         r.consume(next_val);
                     } else {
                         if cur_val == '~' {
-                            let home_dir = match env::var("HOME") {
-                                Ok(val) => val,
-                                Err(_) => {
-                                    eprintln!("Error: environment variable `HOME` not found, defaulting to /home/");
-                                    String::from("/home/")
-                                }
-                            };
+                            let home_dir = utils::home_dir();
                             for i in home_dir.as_bytes() {
                                 string.push(*i);
                             }

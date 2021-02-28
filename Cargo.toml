@@ -1,6 +1,6 @@
 [package]
 name = "yudi_shell"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Yudi Yang <yyang116@u.rochester.edu>"]
 edition = "2018"
 
@@ -17,3 +17,4 @@ opt-level = 3
 subprocess = { git = "https://github.com/2000jedi/rust-subprocess/" }
 lazy_static = "*"
 libc = "*"
+rustyline = "7.1.0"

@@ -2,66 +2,69 @@ extern crate libc;
 
 use std::env;
 use std::io::{self, Write};
+use rustyline::error::ReadlineError;
+use rustyline::Editor;
 
 pub mod reader;
 pub mod scanner;
 pub mod parser;
 pub mod shell;
 pub mod job_manager;
+pub mod utils;
 
 fn repl() {
+    let mut reader = Editor::<()>::new();
+    match reader.load_history(&(utils::home_dir() + "/.rsh_history")) {
+        Ok(_) => {}
+        Err(e) => {
+            println!("load_history() error: {}", e);
+            reader.save_history(&(utils::home_dir() + "/.rsh_history")).unwrap();
+        }
+    };
+
     'main: loop {
-        let path = String::from(
-            env::current_dir().unwrap().as_path().file_stem().unwrap().to_str().unwrap());
-        print!("{} ➜ ", path);
-        io::stdout().flush().unwrap();
-        let mut line = String::new();
-        let mut buf = String::new();
+        let path = String::from(env::current_dir().unwrap().as_path().file_stem().unwrap().to_str().unwrap());
+        let mut readline = reader.readline(&(path + " ➜ "));
+
+        let mut input = String::new();
         loop {
-            match io::stdin().read_line(&mut buf) {
-                Ok(n) => {
-                    if n == 0 {
-                        break 'main;
+            
+            match readline {
+                Ok(mut line) => {
+                    while line.ends_with(' ') {
+                        line.pop();
                     }
-                    if n == 1 {
-                        if line.len() == 0 {
-                            print!("{} ➜ ", path);
-                            io::stdout().flush().unwrap();
-                        } else {
-                            print!("> ");
-                            io::stdout().flush().unwrap();
-                        }
-                        continue;
+                    if line.len() == 0 {
+                        continue 'main;
                     }
-                    if buf.as_bytes()[n - 2] != '\\' as u8 {
-                        line = line + &buf;
-                        break;
+                    input += &line;
+                    if line.as_bytes()[line.len() - 1] == '\\' as u8 {
+                        readline = reader.readline(" > ");
                     } else {
-                        line = line + &buf[..n-2];
+                        break;
                     }
-                    buf = String::new();
-                    print!("> ");
-                    io::stdout().flush().unwrap();
                 }
-                Err(e) => {
-                    panic!("unexpected end-of-input: {}", e);
+                Err(ReadlineError::Interrupted) => {
+                    println!("");
+                    continue 'main;
+                }
+                Err(ReadlineError::Eof) => {
+                    break 'main;
+                }
+                Err(err) => {
+                    eprintln!("{}", err);
+                    continue 'main;
                 }
             }
         }
 
-        if line.ends_with('\n') {
-            /* truncate terminating newline symbols */
-            line.pop();
-            if line.ends_with('\r') {
-                line.pop();
-            }
-        }
-
-        let mut read = reader::Reader::from_string(line);
+        reader.add_history_entry(input.as_str());
+        let mut read = reader::Reader::from_string(input);
         let ast = parser::ast_gen(&mut read);
         println!("{:?}", ast);
         shell::run(ast);
     }
+    reader.append_history(&(utils::home_dir() + "/.rsh_history")).unwrap();
 }
 
 fn run() {

@@ -9,12 +9,16 @@
 - [x] block signals to background processes.  
     - [x] FIXME: this can only be fixed by libc::setpgid, which is not supported in crate `subprocess`.
 - [ ] `bg` and `fg` command
+- [x] Support REPL with GNU/readline
+    - [ ] Support tab-completion
 
 ## Future Works
-- [ ] Support REPL with GNU/readline
 - [ ] add `PATH` and other environment variables
 - [ ] `export` command
 - [ ] parse variable (`$` symbol)
 - [ ] `if` and `for` command
 - [ ] load `/etc/profile` and `~/.rsh_profile` on startup
 - [ ] load `~/.rshrc` during REPL
+
+
+## Tesing Programs
