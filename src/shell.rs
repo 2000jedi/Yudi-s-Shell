@@ -98,25 +98,23 @@ fn builtin(proc_name: String, atom: parser::Atom) {
         "fg" => {
             let job : Option<job_manager::Job> = match JOBS.lock() {
                 Ok(mut jobs) => {
-                    let null = String::new();
                     let job_id = match atom.pars.get(1) {
-                        Some(v) => v,
+                        Some(v) => match v.parse::<u32>() {
+                            Ok(v) => v,
+                            Err(_) => {
+                                println!("fg: job not found: {}", v);
+                                0
+                            }
+                        }
                         None => {
                             eprintln!("fg: no current job");
-                            &null
+                            0
                         }
                     };
+                    if job_id == 0 {
+                        return;
+                    }
 
-                    let job_id = match job_id.parse::<u32>() {
-                        Ok(v) => v,
-                        Err(_) => {
-                            if job_id != "" {
-                                eprintln!("fg: job not found: {}", job_id);
-                            }
-                            
-                            return;
-                        }
-                    };
                     let mut ind : usize = 0;
                     for job in &jobs.jobs {
                         if job.jid == job_id {

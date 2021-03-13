@@ -17,4 +17,4 @@
 - [ ] load `~/.rshrc` during REPL
 
 
-## Tesing Programs
+## Testing Programs
