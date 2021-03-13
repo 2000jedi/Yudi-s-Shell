@@ -96,13 +96,71 @@ fn builtin(proc_name: String, atom: parser::Atom) {
 
         }
         "fg" => {
-            match JOBS.lock() {
-                Ok(_) => {
-                    // TODO: move job to foreground by spinn-waiting it
+            let job : Option<job_manager::Job> = match JOBS.lock() {
+                Ok(mut jobs) => {
+                    let null = String::new();
+                    let job_id = match atom.pars.get(1) {
+                        Some(v) => v,
+                        None => {
+                            eprintln!("fg: no current job");
+                            &null
+                        }
+                    };
+
+                    let job_id = match job_id.parse::<u32>() {
+                        Ok(v) => v,
+                        Err(_) => {
+                            if job_id != "" {
+                                eprintln!("fg: job not found: {}", job_id);
+                            }
+                            
+                            return;
+                        }
+                    };
+                    let mut ind : usize = 0;
+                    for job in &jobs.jobs {
+                        if job.jid == job_id {
+                            break;
+                        }
+                        ind += 1;
+                    }
+
+                    if ind >= jobs.jobs.len() {
+                        println!("fg: job not found: {}", job_id);
+                        return;
+                    }
+
+                    Some(jobs.jobs.remove(ind))
                 }
                 Err(e) => {
                     eprintln!("{}", e);
+                    None
                 }
+            };
+
+            match job {
+                Some(mut job) => {
+                    println!("[{}] {} running {}", job.jid, job.pid, job.cmd);
+                    match FG_JOBS.lock() {
+                        Ok(mut fg) => {
+                            *fg = vec![job.pid];
+                        }
+                        Err(e) => {
+                            eprintln!("{}", e);
+                            return;
+                        }
+                    }
+                    match job.proc.wait() {
+                        Ok(val) => {
+                            println!("[{}] {} {:?} {}",job.jid, job.pid, val, job.cmd);
+                            return;
+                        }
+                        Err(e) => {
+                            println!("error: {}", e);
+                        }
+                    }
+                }
+                None => {}
             }
         }
         "jobs" => {

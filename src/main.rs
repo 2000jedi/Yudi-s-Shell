@@ -1,7 +1,6 @@
 extern crate libc;
 
 use std::env;
-use std::io::{self, Write};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
