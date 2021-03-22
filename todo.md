@@ -5,9 +5,9 @@
 - [x] `fg` command
 - [x] Support REPL with GNU/readline
     - [ ] Support tab-completion
+- [x] support \`  symbol
 
 ## Future Works
-- [ ] support \`  symbol
 - [ ] add `PATH` and other environment variables
 - [ ] `export` command
 - [ ] `alias` command

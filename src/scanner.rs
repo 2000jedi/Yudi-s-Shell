@@ -45,6 +45,42 @@ pub fn next_token(r : &mut reader::Reader) -> Token {
                 return Token::Name(token_val);
             }
 
+            if val == '`' {
+                r.consume('`');
+
+                let mut string : Vec<u8> = Vec::new();
+                while match r.peek() {
+                    Some(val2) => val2 != '`',
+                    None => false,
+                } {
+                    let cur_val = r.peek().unwrap();
+                    string.push(cur_val as u8);
+                    r.consume(cur_val);
+                }
+
+                let token_val = match String::from_utf8(string) {
+                    Ok(v) => v,
+                    Err(_) => panic!("file not encoded in utf-8")
+                };
+
+                r.consume('`');
+                
+                // execute and use as input
+                let args: Vec<&str> = token_val.split(" ").collect();
+                let proc_name = args.get(0).unwrap();
+                let proc_output = subprocess::Exec::cmd(proc_name).args(&args[1..])
+                    .stdout(subprocess::Redirection::Pipe).capture();
+                let proc_output = match proc_output {
+                    Ok(val) => val.stdout_str(),
+                    Err(err) => {
+                        eprintln!("{}", err);
+                        return Token::Error(' ');
+                    }
+                };
+                
+                return Token::Name(proc_output);
+            }
+
             if ! OPERATORS.contains(& val) {
                 // name(id)
                 let mut string : Vec<u8> = Vec::new();
