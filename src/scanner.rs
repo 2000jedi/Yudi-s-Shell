@@ -10,6 +10,13 @@ pub enum Token {
     EOF,
 }
 
+/**
+ * Replace `X` with the result of executing X
+ */
+pub fn replace_exe(s : String) -> String {
+    return s;
+}
+
 const SEPS : [char; 3] = [' ', '\r', '\n'];
 const OPERATORS : [char; 5] = [',', '|', '<', '>', '&'];
     
@@ -114,6 +121,7 @@ pub fn next_token(r : &mut reader::Reader) -> Token {
                     Ok(v) => v,
                     Err(_) => panic!("file not encoded in utf-8")
                 };
+
                 return Token::Name(token_val);
             }
 

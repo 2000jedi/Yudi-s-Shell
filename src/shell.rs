@@ -1,11 +1,13 @@
 extern crate subprocess;
 
+use super::scanner;
 use super::parser;
 use super::job_manager;
 use std::env;
 use std::path::Path;
 use std::fs::File;
 use std::sync::Mutex;
+use std::collections::HashMap;
 
 use subprocess::{Pipeline, Exec, Redirection, Popen};
 use lazy_static::lazy_static;
@@ -13,6 +15,7 @@ use lazy_static::lazy_static;
 lazy_static! {
     pub static ref FG_JOBS : Mutex<Vec<u32>> = Mutex::new(vec![]);
     pub static ref JOBS : Mutex<job_manager::Jobs> = Mutex::new(job_manager::Jobs::new());
+    pub static ref ALIAS : Mutex<HashMap<String, String>> = Mutex::new(HashMap::new());
 }
 
 pub enum Inst {
@@ -74,7 +77,7 @@ fn wait(jobs : Vec<Inst>) {
     }
 }
 
-const BUILTIN : [&str; 5] = ["cd", "jobs", "fg", "bg", "exit"];
+const BUILTIN : [&str; 6] = ["alias", "cd", "jobs", "fg", "bg", "exit"];
 
 fn builtin(proc_name: String, atom: parser::Atom) {
     match proc_name.as_str() {
@@ -174,6 +177,63 @@ fn builtin(proc_name: String, atom: parser::Atom) {
         "exit" => {
             std::process::exit(0);
         }
+        "alias" => {
+            match atom.pars.len() {
+                1 => {
+                    // show all aliases
+                    match ALIAS.lock() {
+                        Ok(a) => {
+                            for (first, second) in &*a {
+                                println!("{}={}", first, second);
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("{}", e);
+                        }
+                    }
+                }
+                2 => {
+                    let arg : Vec<&str> = atom.pars.get(1).unwrap().split("=").collect();
+                    match arg.len() {
+                        1 => {
+                            match ALIAS.lock() {
+                                Ok(a) => {
+                                    let first = &arg.get(0).unwrap().to_string();
+                                    if a.contains_key(first) {
+                                        println!("{}={}", first, a[first]);
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("{}", e);
+                                }
+                            }
+                        }
+                        2 => {
+                            match ALIAS.lock() {
+                                Ok(mut a) => {
+                                    let first = arg.get(0).unwrap().to_string();
+                                    let second = arg.get(1).unwrap().to_string();
+                                    if a.contains_key(&first) {
+                                        *a.get_mut(&first).unwrap() = second;
+                                    } else {
+                                        a.insert(first, second);
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("{}", e);
+                                }
+                            }
+                        }
+                        _ => {
+                            eprintln!("alias: more than one equal operator is detected");
+                        }
+                    }
+                }
+                _ => {
+                    eprintln!("alias: 0 or 1 argument required, {} received", atom.pars.len());
+                }
+            }
+        }
         _ => {
             unreachable!();
         }
@@ -181,7 +241,17 @@ fn builtin(proc_name: String, atom: parser::Atom) {
 }
 
 fn create(v : parser::Atom) -> Option<Exec> {
-    let proc_name = v.pars.get(0).unwrap();
+    let mut proc_name = v.pars.get(0).unwrap().to_string();
+    match ALIAS.lock() {
+        Ok(a) => {
+            if a.contains_key(&proc_name) {
+                proc_name = a[&proc_name].clone();
+                proc_name = scanner::replace_exe(proc_name);
+            }
+        }
+        Err(_) => {}
+    }
+
     if BUILTIN.contains(&proc_name.as_str()) {
         builtin(proc_name.to_string(), v);
         return None;
