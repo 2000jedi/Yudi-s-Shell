@@ -350,6 +350,7 @@ fn walk(ast : parser::AST) -> Vec<Inst> {
                 }
             }
         }
+        parser::AST::None => vec![],
     }
 }
 

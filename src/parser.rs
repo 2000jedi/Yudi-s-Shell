@@ -19,6 +19,7 @@ pub enum AST {
     Fg(Vec<Atom>),                // foreground command: exec < src > dest
     Bg(Vec<Atom>),                // background command: exec < src > dest &
     BinOp(Box<AST>, Box<AST>, Op),// a <op> b
+    None,
 }
 
 peg::parser!{
@@ -54,20 +55,49 @@ peg::parser!{
         }
 
         rule word() -> String
-            = w:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '.' | ',' | '_' | '`' | '-' | '\'' | '"' | '/' | '\\']+) { 
-                // TODO: string manupulation
-                String::from(w)
+            = ws:escape()+ { 
+                ws.join("")
              } / expected!("invalid input")
+
+        rule escape() -> String
+            = w:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '.' | ',' | '_' | '-' | '/' | '=']+) {
+                String::from(w)
+            } / "\"" w:$((!['"'][_])*) "\"" {
+                String::from(w)
+            } / "'" w:$((!['\''][_])*) "'" {
+               String::from(w)
+            } / "`" w:$((!['`'][_])*) "`" {
+                replace_exe(w.to_string())
+            } / "\\" w:$([_]) {
+                String::from(w)
+            }
 
         rule ws() = quiet!{[' ' | '\t']+}
     }
 }
 
 pub fn ast_gen(s : String) -> AST {
-    shell_parser::outer(s.as_str()).unwrap()
+    match shell_parser::outer(s.as_str()) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("{}", e);
+            AST::None
+        }
+    }
 }
 
 pub fn replace_exe(s : String) -> String {
-    // TODO: replace `xxx` with the stdout content from xxx.
-    return s;
+    // Replace `s` with the stdout content from xxx.
+    let args: Vec<&str> = s.split(" ").collect();
+    let proc_name = args.get(0).unwrap();
+    let proc_output = subprocess::Exec::cmd(proc_name).args(&args[1..])
+        .stdout(subprocess::Redirection::Pipe).capture();
+    let proc_output = match proc_output {
+        Ok(val) => val.stdout_str(),
+        Err(err) => {
+            eprintln!("{}", err);
+            return String::new();
+        }
+    };
+    return proc_output;
 }

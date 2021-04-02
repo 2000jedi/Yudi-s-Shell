@@ -2,11 +2,11 @@
 ## Cuurent Works
 
 - [x] refactor parsing with PEG
-    - [ ] process input escape literal ('\')
-    - [ ] process input for ' " and `
+    - [x] process input escape literal ('\')
+    - [x] process input for ' " and `
     - [ ] support for `&&` and `||`
 - [ ] `bg` command
-- [ ] Support tab-completion
+- [ ] Tab-completion
 
 ## Future Works
 - [ ] add `PATH` and other environment variables
