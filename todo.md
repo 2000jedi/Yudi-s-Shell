@@ -1,11 +1,12 @@
 # todo-list
 ## Cuurent Works
 
+- [x] refactor parsing with PEG
+    - [ ] process input escape literal ('\')
+    - [ ] process input for ' " and `
+    - [ ] support for `&&` and `||`
 - [ ] `bg` command
-- [x] `fg` command
-- [x] Support REPL with GNU/readline
-    - [ ] Support tab-completion
-- [x] support \`  symbol
+- [ ] Support tab-completion
 
 ## Future Works
 - [ ] add `PATH` and other environment variables
@@ -13,6 +14,7 @@
 - [ ] `alias` command
 - [ ] parse variable (`$` symbol)
 - [ ] `if` and `for` command
+- [ ] syntax for setting variable before execution (`a=b ./foo`)
 - [ ] load `/etc/profile` and `~/.rsh_profile` on startup
 - [ ] load `~/.rshrc` during REPL
 

@@ -18,3 +18,4 @@ subprocess = { git = "https://github.com/2000jedi/rust-subprocess/" }
 lazy_static = "*"
 libc = "*"
 rustyline = "7.1.0"
+peg = "0.6.3"

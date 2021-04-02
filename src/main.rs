@@ -1,11 +1,10 @@
 extern crate libc;
+extern crate peg;
 
 use std::env;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
-pub mod reader;
-pub mod scanner;
 pub mod parser;
 pub mod shell;
 pub mod job_manager;
@@ -58,8 +57,7 @@ fn repl() {
         }
 
         reader.add_history_entry(input.as_str());
-        let mut read = reader::Reader::from_string(input);
-        let ast = parser::ast_gen(&mut read);
+        let ast = parser::ast_gen(input);
         println!("{:?}", ast);
         shell::run(ast);
     }
@@ -78,15 +76,12 @@ fn run() {
             return;
         }
     };
-    let mut read = reader::Reader::from_file(file_path);
-    let ast = parser::ast_gen(&mut read);
+    let input = match std::fs::read_to_string(file_path) {
+        Ok(t) => t,
+        Err(_e) => panic!("File Not Found"),
+        };
+    let ast = parser::ast_gen(input);
     shell::run(ast);
-
-    while read.has_next() {
-        println!("error: unused token \"{:?}\"", scanner::next_token(&mut read));
-    }
-
-    println!("completed");
 }
 
 fn main() {

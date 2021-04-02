@@ -1,6 +1,5 @@
 extern crate subprocess;
 
-use super::scanner;
 use super::parser;
 use super::job_manager;
 use std::env;
@@ -240,13 +239,13 @@ fn builtin(proc_name: String, atom: parser::Atom) {
     }
 }
 
-fn create(v : parser::Atom) -> Option<Exec> {
+fn create(v : parser::Atom, bg : bool) -> Option<Exec> {
     let mut proc_name = v.pars.get(0).unwrap().to_string();
     match ALIAS.lock() {
         Ok(a) => {
             if a.contains_key(&proc_name) {
                 proc_name = a[&proc_name].clone();
-                proc_name = scanner::replace_exe(proc_name);
+                proc_name = parser::replace_exe(proc_name);
             }
         }
         Err(_) => {}
@@ -273,7 +272,7 @@ fn create(v : parser::Atom) -> Option<Exec> {
         None => {}
     }
 
-    if v.isbg {
+    if bg {
         let bg_proc = match proc.detached().popen() {
             Ok(v) => v,
             Err(e) => {
@@ -298,47 +297,63 @@ fn create(v : parser::Atom) -> Option<Exec> {
     return Some(proc);
 }
 
-fn walk(ast : parser::AST, stdin : Inst) -> Vec<Inst> {
-    match ast {
-        parser::AST::Op(v) => {
-            let proc = match create(v){
+fn walk_pipe(procs : Vec<parser::Atom>, bg : bool) -> Vec<Inst> {
+    if bg {
+        std::thread::spawn(move || {
+            wait(walk_pipe(procs, false));
+        });
+        return vec![];
+    } else {
+        let mut inst : Inst = Inst::N;
+        for p in procs {
+            let proc = match create(p, false) {
                 Some(v) => v,
-                None    => return vec![],
+                None    => { return vec![]; }
             };
 
-            match stdin {
-                Inst::E(proc2) => vec![(Inst::P(proc2 | proc))],
-                Inst::P(pipe)  => vec![(Inst::P(pipe  | proc))],
-                Inst::N        => vec![ Inst::E(proc)],
+            inst = match inst {
+                Inst::E(proc2) => Inst::P(proc2 | proc),
+                Inst::P(pipe)  => Inst::P(pipe  | proc),
+                Inst::N        => Inst::E(proc),
+            };
+        }
+        
+        return vec![inst];
+    }
+}
+
+fn walk(ast : parser::AST) -> Vec<Inst> {
+    match ast {
+        parser::AST::Fg(v) => {
+            walk_pipe(v, false)
+        }
+        parser::AST::Bg(v) => {
+            walk_pipe(v, true)
+        }
+        parser::AST::BinOp(first, second, opr) => {
+            match opr {
+                parser::Op::AND => {
+                    let proc1 = walk(*first);
+                    wait(proc1);
+                    // TODO: result manipulation
+                    let proc2 = walk(*second);
+                    proc2
+                }
+                parser::Op::SEQ => {
+                    let mut proc1 = walk(*first);
+                    let mut proc2 = walk(*second);
+                    proc1.append(&mut proc2);
+                    proc1
+                }
+                _ => {
+                    unreachable!();
+                }
             }
         }
-        parser::AST::Pipe(first, second) => {
-            let proc1 = match create(first){
-                Some(v) => v,
-                None    => return vec![],
-            };
-
-            let pipe = match stdin {
-                Inst::E(proc2) => Inst::P(proc2 | proc1),
-                Inst::P(pipe)  => Inst::P(pipe  | proc1),
-                Inst::N        => Inst::E(proc1),
-            };
-
-            walk(*second, pipe)
-        }
-        parser::AST::And(first, second) => {
-            let mut proc1 = walk(*first, Inst::N);
-            let mut proc2 = walk(*second, Inst::N);
-            proc1.append(&mut proc2);
-
-            proc1
-        }
-        parser::AST::Empty => vec![],
-        parser::AST::Error => panic!("an error occured in command-line"),
     }
 }
 
 pub fn run(ast : parser::AST) {
-    let procs = walk(ast, Inst::N);
+    let procs = walk(ast);
     wait(procs);
 }
