@@ -4,7 +4,7 @@
 - [x] refactor parsing with PEG
     - [x] process input escape literal ('\')
     - [x] process input for ' " and `
-    - [ ] support for `&&` and `||`
+    - [x] support for `&&` and `||`
 - [ ] `bg` command
 - [ ] Tab-completion
 

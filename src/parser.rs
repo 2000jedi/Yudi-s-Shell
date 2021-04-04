@@ -68,6 +68,8 @@ peg::parser!{
                String::from(w)
             } / "`" w:$((!['`'][_])*) "`" {
                 replace_exe(w.to_string())
+            } / "$(" w:$((![')'][_])*) ")" {
+                replace_exe(w.to_string())
             } / "\\" w:$([_]) {
                 String::from(w)
             }
@@ -92,12 +94,18 @@ pub fn replace_exe(s : String) -> String {
     let proc_name = args.get(0).unwrap();
     let proc_output = subprocess::Exec::cmd(proc_name).args(&args[1..])
         .stdout(subprocess::Redirection::Pipe).capture();
-    let proc_output = match proc_output {
+    let mut proc_output = match proc_output {
         Ok(val) => val.stdout_str(),
         Err(err) => {
             eprintln!("{}", err);
             return String::new();
         }
     };
+    if proc_output.ends_with('\n') {
+        proc_output.pop();
+        if proc_output.ends_with('\r') {
+            proc_output.pop();
+        }
+    }
     return proc_output;
 }

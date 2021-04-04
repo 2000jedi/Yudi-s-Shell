@@ -8,7 +8,7 @@ use std::fs::File;
 use std::sync::Mutex;
 use std::collections::HashMap;
 
-use subprocess::{Pipeline, Exec, Redirection, Popen};
+use subprocess::{Pipeline, Exec, Redirection, Popen, ExitStatus};
 use lazy_static::lazy_static;
 
 lazy_static! {
@@ -23,7 +23,7 @@ pub enum Inst {
     N,            // null
 }
 
-fn wait(jobs : Vec<Inst>) {
+fn wait(jobs : Vec<Inst>) -> ExitStatus {
     let mut procs : Vec<Popen> = vec![];
     let mut pids : Vec<u32> = vec![];
     for j in jobs {
@@ -58,22 +58,22 @@ fn wait(jobs : Vec<Inst>) {
         }
         Err(e) => {
             eprintln!("{}", e);
-            return;
+            return ExitStatus::Exited(255);
         }
     }
 
+    let mut exit_status : ExitStatus = ExitStatus::Exited(0);
     for mut p in procs {
-        let exit_status = match p.wait() {
+        exit_status = match p.wait() {
             Ok(val) => val,
             Err(err) => {
                 println!("{}", err);
                 continue;
             }
         };
-        if ! exit_status.success() {
-            println!("[Process exited with {:?}]", exit_status);
-        }
     }
+
+    return exit_status;
 }
 
 const BUILTIN : [&str; 6] = ["alias", "cd", "jobs", "fg", "bg", "exit"];
@@ -245,6 +245,7 @@ fn create(v : parser::Atom, bg : bool) -> Option<Exec> {
         Ok(a) => {
             if a.contains_key(&proc_name) {
                 proc_name = a[&proc_name].clone();
+                // TODO: this part should be modified
                 proc_name = parser::replace_exe(proc_name);
             }
         }
@@ -298,63 +299,62 @@ fn create(v : parser::Atom, bg : bool) -> Option<Exec> {
 }
 
 fn walk_pipe(procs : Vec<parser::Atom>, bg : bool) -> Vec<Inst> {
-    if bg {
-        std::thread::spawn(move || {
-            wait(walk_pipe(procs, false));
-        });
-        return vec![];
-    } else {
-        let mut inst : Inst = Inst::N;
-        for p in procs {
-            let proc = match create(p, false) {
-                Some(v) => v,
-                None    => { return vec![]; }
-            };
+    let mut inst : Inst = Inst::N;
+    for p in procs {
+        let proc = match create(p, bg) {
+            Some(v) => v,
+            None    => { return vec![]; }
+        };
 
-            inst = match inst {
-                Inst::E(proc2) => Inst::P(proc2 | proc),
-                Inst::P(pipe)  => Inst::P(pipe  | proc),
-                Inst::N        => Inst::E(proc),
-            };
-        }
-        
-        return vec![inst];
+        inst = match inst {
+            Inst::E(proc2) => Inst::P(proc2 | proc),
+            Inst::P(pipe)  => Inst::P(pipe  | proc),
+            Inst::N        => Inst::E(proc),
+        };
     }
+    
+    return vec![inst];
 }
 
-fn walk(ast : parser::AST) -> Vec<Inst> {
+fn walk(ast : parser::AST) -> ExitStatus {
     match ast {
         parser::AST::Fg(v) => {
-            walk_pipe(v, false)
+            wait(walk_pipe(v, false))
         }
         parser::AST::Bg(v) => {
-            walk_pipe(v, true)
+            wait(walk_pipe(v, true))
         }
         parser::AST::BinOp(first, second, opr) => {
             match opr {
                 parser::Op::AND => {
                     let proc1 = walk(*first);
-                    wait(proc1);
-                    // TODO: result manipulation
-                    let proc2 = walk(*second);
-                    proc2
+                    if proc1.success() {
+                        let proc2 = walk(*second);
+                        return proc2;
+                    }
+                    return proc1;
+                }
+                parser::Op::OR => {
+                    let proc1 = walk(*first);
+                    if ! proc1.success() {
+                        let proc2 = walk(*second);
+                        return proc2;
+                    }
+                    return proc1;
                 }
                 parser::Op::SEQ => {
-                    let mut proc1 = walk(*first);
-                    let mut proc2 = walk(*second);
-                    proc1.append(&mut proc2);
-                    proc1
-                }
-                _ => {
-                    unreachable!();
+                    walk(*first);
+                    walk(*second)
                 }
             }
         }
-        parser::AST::None => vec![],
+        parser::AST::None => ExitStatus::Exited(0),
     }
 }
 
 pub fn run(ast : parser::AST) {
     let procs = walk(ast);
-    wait(procs);
+    if ! procs.success() {
+        println!("[Process exited with {:?}]", procs);
+    }
 }
